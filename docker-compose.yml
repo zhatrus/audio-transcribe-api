@@ -1,0 +1,25 @@
+name: audio-transcribe-api
+services:
+  app:
+    image: audio-transcribe-api-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - models:/home/app/.cache/huggingface
+      - ./app:/home/app/app
+      - /tmp/audio-transcribe-api:/tmp/audio-transcribe-api
+    environment:
+      - DEVICE=${DEVICE:-cpu}
+      - COMPUTE_TYPE=${COMPUTE_TYPE:-int8}
+      - MODEL_SIZE=${MODEL_SIZE:-small}
+      - HF_TOKEN=${HF_TOKEN}
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8000}
+      - WORKERS=${WORKERS:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+volumes:
+  models:
