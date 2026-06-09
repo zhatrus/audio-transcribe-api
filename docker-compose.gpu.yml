@@ -1,7 +1,6 @@
 name: ${SERVICE_NAME:-audio-transcribe-api}
 services:
   app:
-    image: ${SERVICE_NAME:-audio-transcribe-api}-app:gpu
     build:
       context: .
       dockerfile: Dockerfile.gpu
@@ -14,8 +13,8 @@ services:
     environment:
       - DEVICE=gpu
       - COMPUTE_TYPE=float16
-      - MODEL_SIZE=${MODEL_SIZE:-large-v3}
-      - HF_TOKEN=${HF_TOKEN:?set HF_TOKEN}
+      - MODEL_SIZE=${MODEL_SIZE:-medium}
+      - HF_TOKEN=${HF_TOKEN}
       - HOST=0.0.0.0
       - PORT=8000
       - WORKERS=1
@@ -28,5 +27,6 @@ services:
               count: 1
               capabilities: [gpu]
     restart: unless-stopped
+
 volumes:
   models:
