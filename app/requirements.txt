@@ -1,6 +1,8 @@
 fastapi==0.111.0
 uvicorn==0.29.0
 faster-whisper==1.1.0
+# pyannote 3.1.1 / torch 2.1.2 need NumPy 1.x (np.NaN + ABI). NumPy 2.x breaks both.
+numpy==1.26.4
 # Pin torch/torchaudio: pyannote.audio 3.1.1 uses torchaudio.set_audio_backend,
 # which newer torchaudio (>=2.2) removed. 2.1.2 is the last compatible pair.
 torch==2.1.2
