@@ -1,5 +1,6 @@
 # GPU image (CUDA 12.6 + cuDNN 9). Requires NVIDIA Container Toolkit on the host.
-FROM nvidia/cuda:12.6.3-cudnn9-runtime-ubuntu22.04
+# Note: for cuDNN 9 the tag is "-cudnn-" (no version digit), not "-cudnn9-".
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 # Override to install a CUDA-matched torch build if needed, e.g.
