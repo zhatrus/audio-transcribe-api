@@ -1,12 +1,24 @@
 import os
+import torch
 from faster_whisper import WhisperModel
 from .utils import UPLOAD_DIR
 
 
+def _detect_device():
+    env = os.getenv("DEVICE", "cpu").strip().lower()
+    if env == "gpu" and torch.cuda.is_available():
+        return "cuda"
+    if env == "cpu":
+        return "cpu"
+    if env == "cuda" and torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
 def get_model():
     model_size = os.getenv("MODEL_SIZE", "medium")
-    device = os.getenv("DEVICE", "cpu")
-    compute_type = "float16" if device == "gpu" else "int8"
+    device = _detect_device()
+    compute_type = "float16" if device == "cuda" else "int8"
     model = WhisperModel(
         model_size,
         device=device,
