@@ -1,8 +1,20 @@
 .PHONY: help env build up down restart update logs ps health shell clean cpu gpu
 
 COMPOSE_FILE ?= docker-compose.yml
-DC = docker compose -f $(COMPOSE_FILE)
 PORT ?= 8000
+
+# Auto-detect the compose command: prefer the v2 plugin (`docker compose`),
+# fall back to the standalone v1 binary (`docker-compose`).
+DOCKER_COMPOSE := $(shell \
+	if docker compose version >/dev/null 2>&1; then echo "docker compose"; \
+	elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; \
+	else echo ""; fi)
+DC = $(DOCKER_COMPOSE) -f $(COMPOSE_FILE)
+
+ifeq ($(strip $(DOCKER_COMPOSE)),)
+$(warning Neither "docker compose" nor "docker-compose" was found in PATH. \
+Install Docker, or run with sudo / add your user to the "docker" group.)
+endif
 
 help: ## Show this help
 	@echo "Audio Transcribe API — targets:"
