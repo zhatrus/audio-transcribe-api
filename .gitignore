@@ -8,6 +8,7 @@ __pycache__/
 /models/*
 !/models/.gitkeep
 tmp/
+_data/
 *.wav
 *.mp3
 *.mp4

@@ -1,40 +1,62 @@
-.PHONY: help build up down logs shell clean install cpu gpu
+.PHONY: help env build up down restart update logs ps health shell clean cpu gpu
 
-SERVICE_NAME=audio-transcribe-api
-COMPOSE_FILE=docker-compose.yml
+COMPOSE_FILE ?= docker-compose.yml
+DC = docker compose -f $(COMPOSE_FILE)
+PORT ?= 8000
 
-help: ## Show help
-	@echo "Available targets:"
-	@echo "  make build   — build image"
-	@echo "  make up      — start service"
-	@echo "  make down    — stop service"
-	@echo "  make logs    — tail logs"
-	@echo "  make gpu     — build/run GPU variant"
-	@echo "  make cpu     — build/run CPU variant"
+help: ## Show this help
+	@echo "Audio Transcribe API — targets:"
+	@echo "  make env       — create .env from .env.example (if missing)"
+	@echo "  make build     — build image (CPU default)"
+	@echo "  make up        — start in background"
+	@echo "  make down      — stop"
+	@echo "  make restart   — restart service"
+	@echo "  make update    — pull code build, recreate container"
+	@echo "  make logs      — tail logs"
+	@echo "  make ps        — container status"
+	@echo "  make health    — curl /health"
+	@echo "  make shell     — shell into the container"
+	@echo "  make clean     — stop and remove volumes + image"
+	@echo "  make cpu       — build+run CPU variant (docker-compose.cpu.yml)"
+	@echo "  make gpu       — build+run GPU variant (docker-compose.gpu.yml)"
 
-.PHONY: cpu
-cpu: COMPOSE_FILE=docker-compose.cpu.yml
-cpu: build up
-
-.PHONY: gpu
-gpu: COMPOSE_FILE=docker-compose.gpu.yml
-gpu: build up
+env: ## Create .env from template
+	@test -f .env || (cp .env.example .env && echo "Created .env — edit HF_TOKEN / API_KEY / DEVICE")
 
 build: ## Build image
-	docker compose -f $(COMPOSE_FILE) build
+	$(DC) build
 
 up: ## Start service
-	docker compose -f $(COMPOSE_FILE) up -d
+	$(DC) up -d
 
 down: ## Stop service
-	docker compose -f $(COMPOSE_FILE) down
+	$(DC) down
+
+restart: ## Restart service
+	$(DC) restart
+
+update: ## Rebuild from current code and recreate the container
+	$(DC) build
+	$(DC) up -d --force-recreate
 
 logs: ## Tail logs
-	docker compose -f $(COMPOSE_FILE) logs -f
+	$(DC) logs -f --tail=200
 
-shell: ## Open shell in container
-	docker compose -f $(COMPOSE_FILE) exec app bash
+ps: ## Show status
+	$(DC) ps
 
-clean: ## Remove image + volumes
-	docker compose -f $(COMPOSE_FILE) down -v
-	docker image rm $(SERVICE_NAME)_app || true
+health: ## Hit the health endpoint
+	curl -fsS http://localhost:$(PORT)/health && echo
+
+shell: ## Open a shell in the container
+	$(DC) exec app bash
+
+clean: ## Stop and remove volumes + image
+	$(DC) down -v
+	-docker image rm audio-transcribe-api-app
+
+cpu: ## Build + run CPU variant
+	$(MAKE) COMPOSE_FILE=docker-compose.cpu.yml build up
+
+gpu: ## Build + run GPU variant
+	$(MAKE) COMPOSE_FILE=docker-compose.gpu.yml build up

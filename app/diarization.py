@@ -1,40 +1,45 @@
-import os
-from pyannote.audio import Pipeline
+"""Speaker diarization via pyannote.audio with a cached, idle-evicted pipeline."""
+import logging
+
 import torch
-from .utils import UPLOAD_DIR
+from pyannote.audio import Pipeline
+
+from .config import get_settings
+from .model_manager import LazyModel, register
+
+logger = logging.getLogger("app.diarization")
 
 
-def get_pipeline():
-    hf_token = os.getenv("HF_TOKEN")
-    if not hf_token:
+def _load_pipeline() -> Pipeline:
+    s = get_settings()
+    if not s.hf_token:
         raise RuntimeError("HF_TOKEN is required for diarization")
-
-    device = os.getenv("DEVICE", "cpu")
-    torch_device = torch.device("cuda" if device == "gpu" else "cpu")
-
+    logger.info("Init pyannote pipeline on device=%s", s.device)
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=hf_token,
+        use_auth_token=s.hf_token,
     )
-    pipeline.to(torch_device)
+    pipeline.to(torch.device(s.device))
     return pipeline
 
 
-def run_diarization(path, min_speakers=None, max_speakers=None):
-    pipeline = get_pipeline()
+_pipeline = register(
+    LazyModel(
+        "pyannote-diarization",
+        _load_pipeline,
+        idle_timeout_sec=get_settings().model_idle_timeout_min * 60,
+    )
+)
+
+
+def run_diarization(path, min_speakers=None, max_speakers=None) -> list[dict]:
+    pipeline: Pipeline = _pipeline.get()  # type: ignore[assignment]
     diarization = pipeline(
         str(path),
         min_speakers=min_speakers,
         max_speakers=max_speakers,
     )
-
-    turns = []
+    turns: list[dict] = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
-        turns.append(
-            {
-                "start": turn.start,
-                "end": turn.end,
-                "speaker": speaker,
-            }
-        )
+        turns.append({"start": turn.start, "end": turn.end, "speaker": speaker})
     return turns

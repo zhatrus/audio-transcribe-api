@@ -1,21 +1,18 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
+# CPU image (default). For GPU use Dockerfile.gpu / docker-compose.gpu.yml.
+FROM python:3.11-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG PIP_EXTRA_INDEX_URL=
-ARG PIP_INDEX_URL=
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
+    HF_HOME=/home/app/.cache/huggingface \
+    DATA_DIR=/data \
     OMP_NUM_THREADS=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    python3-dev \
     build-essential \
-    git \
-    curl \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home/app
@@ -25,7 +22,8 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY app /home/app/app
 
-VOLUME ["/home/app/.cache/huggingface", "/tmp/audio-transcribe-api"]
+RUN mkdir -p /data /home/app/.cache/huggingface
+VOLUME ["/home/app/.cache/huggingface", "/data"]
 
 EXPOSE 8000
 

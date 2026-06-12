@@ -9,17 +9,25 @@ services:
       - "${PORT:-8000}:8000"
     volumes:
       - models:/home/app/.cache/huggingface
-      - ./app:/home/app/app
-      - /tmp/audio-transcribe-api:/tmp/audio-transcribe-api
+      - data:/data
     environment:
       - DEVICE=${DEVICE:-cpu}
-      - COMPUTE_TYPE=${COMPUTE_TYPE:-int8}
+      - COMPUTE_TYPE=${COMPUTE_TYPE:-}
       - MODEL_SIZE=${MODEL_SIZE:-small}
+      - MODEL_IDLE_TIMEOUT_MIN=${MODEL_IDLE_TIMEOUT_MIN:-30}
+      - LANGUAGE=${LANGUAGE:-auto}
       - HF_TOKEN=${HF_TOKEN}
+      - DATA_DIR=/data
+      - RESULT_TTL_HOURS=${RESULT_TTL_HOURS:-24}
+      - DELIVERED_TTL_HOURS=${DELIVERED_TTL_HOURS:-6}
+      - CLEANUP_INTERVAL_MIN=${CLEANUP_INTERVAL_MIN:-10}
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-1024}
+      - API_KEY=${API_KEY:-}
       - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-8000}
-      - WORKERS=${WORKERS:-1}
+      - WORKERS=1
       - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
 volumes:
   models:
+  data:

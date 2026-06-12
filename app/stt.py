@@ -1,84 +1,66 @@
-import os
-import torch
+"""Speech-to-text via faster-whisper with a cached, idle-evicted model."""
+import logging
+
 from faster_whisper import WhisperModel
-from .utils import UPLOAD_DIR
+
+from .config import get_settings
+from .model_manager import LazyModel, register
+
+logger = logging.getLogger("app.stt")
 
 
-def _detect_device():
-    env = os.getenv("DEVICE", "cpu").strip().lower()
-    if env == "gpu" and torch.cuda.is_available():
-        return "cuda"
-    if env == "cpu":
-        return "cpu"
-    if env == "cuda" and torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
-
-
-def get_model():
-    model_size = os.getenv("MODEL_SIZE", "medium")
-    device = _detect_device()
-    compute_type = "float16" if device == "cuda" else "int8"
-    model = WhisperModel(
-        model_size,
-        device=device,
-        compute_type=compute_type,
+def _load_model() -> WhisperModel:
+    s = get_settings()
+    logger.info(
+        "Init WhisperModel size=%s device=%s compute_type=%s",
+        s.model_size,
+        s.device,
+        s.compute_type,
     )
-    return model
+    return WhisperModel(s.model_size, device=s.device, compute_type=s.compute_type)
 
 
-from faster_whisper import WhisperModel
-from pyannote.audio import Pipeline
-import torch
-from .utils import UPLOAD_DIR
+_model = register(
+    LazyModel(
+        "faster-whisper",
+        _load_model,
+        idle_timeout_sec=get_settings().model_idle_timeout_min * 60,
+    )
+)
 
 
-def _model():
-    size = _env("MODEL_SIZE", "medium")
-    device = _env("DEVICE", "cpu")
-    ctype = "float16" if device == "gpu" else "int8"
-    return WhisperModel(size, device=device, compute_type=ctype)
+def preload() -> None:
+    """Eagerly load the model (used at startup to surface config errors early)."""
+    _model.get()
 
 
-def _pipeline():
-    token = _env("HF_TOKEN")
-    if not token:
-        raise RuntimeError("HF_TOKEN is required for diarization")
-    device = _env("DEVICE", "cpu")
-    torch_device = torch.device("cuda" if device == "gpu" else "cpu")
-    p = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=token)
-    p.to(torch_device)
-    return p
-
-
-def _env(name, default=None):
-    v = os.environ.get(name, default)
-    if v is None:
-        raise RuntimeError(f"Missing env: {name}")
-    return v
-
-
-def transcribe(path, language=None):
-    m = _model()
-    segs, info = m.transcribe(
+def transcribe(path, language=None) -> dict:
+    model: WhisperModel = _model.get()  # type: ignore[assignment]
+    segments, info = model.transcribe(
         str(path),
         language=language,
         beam_size=5,
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
     )
-    out = {"language": info.language, "duration": info.duration, "text": "", "segments": []}
-    for s in segs:
-        out["text"] += s.text + " "
-        out["segments"].append({"start": s.start, "end": s.end, "text": s.text.strip(), "probability": s.probability})
-    out["text"] = out["text"].strip()
+
+    out = {
+        "language": info.language,
+        "duration": info.duration,
+        "text": "",
+        "segments": [],
+    }
+    parts: list[str] = []
+    for s in segments:
+        text = s.text.strip()
+        parts.append(text)
+        out["segments"].append(
+            {
+                "start": s.start,
+                "end": s.end,
+                "text": text,
+                "probability": getattr(s, "avg_logprob", None),
+            }
+        )
+    out["text"] = " ".join(parts).strip()
     return out
-
-
-def diarize(path, min_speakers=None, max_speakers=None):
-    p = _pipeline()
-    d = p(str(path), min_speakers=min_speakers, max_speakers=max_speakers)
-    turns = []
-    for turn, _, speaker in d.itertracks(yield_label=True):
-        turns.append({"start": turn.start, "end": turn.end, "speaker": speaker})
-    return turns
