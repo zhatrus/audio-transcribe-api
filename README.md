@@ -86,6 +86,8 @@ make COMPOSE_FILE=docker-compose.gpu.yml update
 | `CLEANUP_INTERVAL_MIN` | `10` | how often cleanup runs |
 | `MAX_UPLOAD_MB` | `1024` | reject larger uploads (`0` = unlimited) |
 | `API_KEY` | — | if set, requests need header `X-API-Key` |
+| `WEBHOOK_URL` | — | if set, finished jobs are POSTed here as JSON |
+| `WEBHOOK_TIMEOUT_SEC` | `15` | webhook request timeout |
 | `PORT` | `8000` | host port |
 | `WORKERS` | `1` | keep at 1 (single background worker) |
 
@@ -100,7 +102,8 @@ All endpoints except `/health` require `X-API-Key: <API_KEY>` **if** `API_KEY` i
 
 ### `POST /transcribe` (multipart/form-data)
 Fields: `file` (audio/video), `language` (`auto|uk|ru|en`), `diarize` (`true|false`),
-`min_speakers`, `max_speakers` (optional).
+`min_speakers`, `max_speakers` (optional), `webhook_url` (optional — overrides
+`WEBHOOK_URL`).
 
 ```bash
 curl -X POST http://localhost:8000/transcribe \
@@ -133,6 +136,12 @@ Delete one job and its cached result.
 
 ### `DELETE /jobs`
 Delete all jobs.
+
+### Webhook (no polling)
+If `WEBHOOK_URL` is set (or a `webhook_url` field is sent with the upload), the
+service POSTs the finished job to that URL as JSON when it reaches `done` or
+`error` — the same body as `GET /jobs/{id}`. Ideal for long recordings where
+polling would be wasteful. The request is retried once on failure.
 
 ## n8n flow
 

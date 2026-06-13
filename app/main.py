@@ -101,6 +101,7 @@ async def transcribe_endpoint(
     diarize: bool = Form(False),
     min_speakers: int | None = Form(None),
     max_speakers: int | None = Form(None),
+    webhook_url: str | None = Form(None),
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Empty filename")
@@ -113,6 +114,7 @@ async def transcribe_endpoint(
         "diarize": diarize,
         "min_speakers": min_speakers,
         "max_speakers": max_speakers,
+        "webhook_url": webhook_url or None,
     }
     store.create_job(file.filename, params, upload_path, job_id=job_id)
     worker.enqueue(job_id)

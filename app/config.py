@@ -75,6 +75,11 @@ class Settings:
         self.max_upload_mb = _get_int("MAX_UPLOAD_MB", 1024)
         self.api_key = os.getenv("API_KEY") or None
 
+        # Optional default webhook: POSTed the job (result/error) on completion.
+        # A per-request `webhook_url` form field overrides this.
+        self.webhook_url = os.getenv("WEBHOOK_URL") or None
+        self.webhook_timeout_sec = _get_int("WEBHOOK_TIMEOUT_SEC", 15)
+
         # Server
         self.host = os.getenv("HOST", "0.0.0.0")
         self.port = _get_int("PORT", 8000)

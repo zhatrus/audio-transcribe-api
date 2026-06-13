@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-13
+- Optional webhook callback: finished jobs (done/error) are POSTed as JSON to
+  `WEBHOOK_URL` or a per-request `webhook_url` field — avoids polling for long
+  recordings. Retried once on failure.
+
 ## 2026-06-12
 - Rework to an asynchronous job-based API: `POST /transcribe` returns a `job_id`
   immediately; results are polled via `GET /jobs/{id}`.

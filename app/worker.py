@@ -5,11 +5,14 @@ synchronous transcription runs in a thread executor so the event loop (and the
 health endpoint) stays responsive.
 """
 import asyncio
+import json
 import logging
 import time
+import urllib.request
 from pathlib import Path
 
 from . import store
+from .config import get_settings
 from .diarization import run_diarization
 from .stt import transcribe
 
@@ -48,6 +51,38 @@ def _process(job: dict) -> dict:
     }
 
 
+def _post_webhook(url: str, payload: dict, timeout: int) -> int:
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST", headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return getattr(resp, "status", resp.getcode())
+
+
+async def _notify_webhook(job: dict) -> None:
+    """POST the finished job to its webhook (per-job param overrides env default)."""
+    url = (job.get("params") or {}).get("webhook_url") or get_settings().webhook_url
+    if not url:
+        return
+    payload = store.public_view(job)
+    timeout = get_settings().webhook_timeout_sec
+    loop = asyncio.get_running_loop()
+    for attempt in (1, 2):
+        try:
+            status = await loop.run_in_executor(None, _post_webhook, url, payload, timeout)
+            logger.info("Webhook delivered job %s -> HTTP %s", job["id"], status)
+            return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Webhook attempt %d failed for job %s (%s): %s",
+                attempt, job["id"], url, exc,
+            )
+            if attempt == 1:
+                await asyncio.sleep(2)
+    logger.error("Webhook giving up for job %s", job["id"])
+
+
 async def _run_one(job_id: str) -> None:
     job = store.get_job(job_id)
     if job is None:
@@ -84,6 +119,11 @@ async def _run_one(job_id: str) -> None:
             except OSError:
                 pass
             store.update_job(job_id, upload_path=None)
+
+    # Notify the webhook (if any) with the final job state.
+    final = store.get_job(job_id)
+    if final is not None:
+        await _notify_webhook(final)
 
 
 async def worker_loop() -> None:
