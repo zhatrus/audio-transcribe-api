@@ -19,6 +19,13 @@ def _load_pipeline() -> Pipeline:
         "pyannote/speaker-diarization-3.1",
         use_auth_token=s.hf_token,
     )
+    if pipeline is None:
+        # from_pretrained returns None (not raises) when the token lacks access.
+        raise RuntimeError(
+            "Failed to load pyannote pipeline. Check HF_TOKEN and accept the model "
+            "conditions at https://hf.co/pyannote/speaker-diarization-3.1 and "
+            "https://hf.co/pyannote/segmentation-3.0"
+        )
     pipeline.to(torch.device(s.device))
     return pipeline
 
