@@ -4,6 +4,12 @@
 - Optional webhook callback: finished jobs (done/error) are POSTed as JSON to
   `WEBHOOK_URL` or a per-request `webhook_url` field — avoids polling for long
   recordings. Retried once on failure.
+- Diarization: normalize audio to mono 16 kHz (ffmpeg) before pyannote to fix
+  the "Sizes of tensors must match" error on video/stereo inputs; make it
+  best-effort — on failure the job still returns the transcription plus a
+  `diarization_error` field.
+- Optional `subtitles=true` form field adds an `srt` field (with speaker labels
+  when diarization is available).
 
 ## 2026-06-12
 - Rework to an asynchronous job-based API: `POST /transcribe` returns a `job_id`

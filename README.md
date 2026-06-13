@@ -102,8 +102,16 @@ All endpoints except `/health` require `X-API-Key: <API_KEY>` **if** `API_KEY` i
 
 ### `POST /transcribe` (multipart/form-data)
 Fields: `file` (audio/video), `language` (`auto|uk|ru|en`), `diarize` (`true|false`),
-`min_speakers`, `max_speakers` (optional), `webhook_url` (optional — overrides
-`WEBHOOK_URL`).
+`min_speakers`, `max_speakers` (optional), `subtitles` (`true|false` — adds an
+`srt` field), `webhook_url` (optional — overrides `WEBHOOK_URL`).
+
+Notes:
+- Diarization is **best-effort**: if it fails, the job still returns the
+  transcription with `speakers: null` and a `diarization_error` field (no hard
+  failure). Audio is normalized to mono 16 kHz before diarization to avoid the
+  pyannote tensor-size error on video/stereo inputs.
+- With `subtitles=true`, the result includes `srt` (SRT built from segments;
+  prefixed with `[SPEAKER_xx]` when diarization succeeded).
 
 ```bash
 curl -X POST http://localhost:8000/transcribe \

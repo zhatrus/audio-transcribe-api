@@ -33,15 +33,24 @@ def _process(job: dict) -> dict:
     lang = None if not language or language == "auto" else language
 
     transcription = transcribe(path, language=lang)
-    speakers = None
-    if params.get("diarize"):
-        speakers = run_diarization(
-            path,
-            min_speakers=params.get("min_speakers"),
-            max_speakers=params.get("max_speakers"),
-        )
 
-    return {
+    speakers = None
+    diarization_error = None
+    if params.get("diarize"):
+        try:
+            speakers = run_diarization(
+                path,
+                min_speakers=params.get("min_speakers"),
+                max_speakers=params.get("max_speakers"),
+            )
+        except Exception as exc:  # noqa: BLE001 - fall back to transcription-only
+            diarization_error = str(exc)
+            logger.warning(
+                "Diarization failed for job %s, returning transcription only: %s",
+                job.get("id"), exc,
+            )
+
+    result = {
         "file": job.get("filename"),
         "language": transcription["language"],
         "duration": transcription["duration"],
@@ -49,6 +58,13 @@ def _process(job: dict) -> dict:
         "segments": transcription["segments"],
         "speakers": speakers,
     }
+    if diarization_error:
+        result["diarization_error"] = diarization_error
+    if params.get("subtitles"):
+        from .formatting import build_srt
+
+        result["srt"] = build_srt(transcription["segments"], speakers)
+    return result
 
 
 def _post_webhook(url: str, payload: dict, timeout: int) -> int:
