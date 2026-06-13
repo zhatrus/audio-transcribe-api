@@ -72,6 +72,9 @@ async def _notify_webhook(job: dict) -> None:
         try:
             status = await loop.run_in_executor(None, _post_webhook, url, payload, timeout)
             logger.info("Webhook delivered job %s -> HTTP %s", job["id"], status)
+            # A successful push counts as delivery -> starts the post-delivery TTL.
+            if job.get("delivered_at") is None:
+                store.update_job(job["id"], delivered_at=time.time())
             return
         except Exception as exc:  # noqa: BLE001
             logger.warning(
