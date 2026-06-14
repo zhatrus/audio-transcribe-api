@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-from . import store, worker
+from . import stt, store, worker
 from .auth import require_api_key
 from .config import get_settings
 from .model_manager import evict_idle
@@ -92,6 +92,28 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/v1/audio/transcriptions", dependencies=[Depends(require_api_key)])
+async def openai_transcriptions(
+    file: UploadFile = File(...),
+    model: str = Form("whisper-1"),  # noqa: ARG001 — accepted for compatibility, ignored
+    language: str | None = Form(None),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Empty filename")
+
+    job_id = new_job_id()
+    upload_path = await save_upload(file, job_id)
+    try:
+        lang = None if language in (None, "auto") else language
+        result = await asyncio.get_running_loop().run_in_executor(
+            None, stt.transcribe, upload_path, lang
+        )
+    finally:
+        upload_path.unlink(missing_ok=True)
+
+    return {"text": result["text"]}
 
 
 @app.post("/transcribe", dependencies=[Depends(require_api_key)])
