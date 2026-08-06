@@ -19,3 +19,4 @@ _data/
 *.aac
 *.log
 .cache/
+.deploy_ssh.py
